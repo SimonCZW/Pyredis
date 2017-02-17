@@ -37,8 +37,7 @@ def arg_parse():
 
     subparsers = parser.add_subparsers(
         title = 'Subcommands CMD',
-        description = """
-    SHELL                   Open a shell.
+        description = """    SHELL                   Open a shell.
     SET key value           Set value.
     GET key
     AUTH username password
@@ -95,7 +94,6 @@ def arg_parse():
     parser_get.add_argument(
         action = 'store_true',
         dest = 'shell',
-        default = False,
         help = 'Open a shell.')
     return parser.parse_args()
 
@@ -104,28 +102,87 @@ args = arg_parse()
 for k,v in vars(args).iteritems():
     if v:
         config[k] = v
+    config.setdefault('shell', False)
+    config.setdefault('kvset', False)
+    config.setdefault('kget', False)
+    config.setdefault('auth', False)
+    config.setdefault('url', False)
 
-print config
+#print config
 
-#HOST='127.0.0.1'
-#PORT=5678
-#BUFSIZ=1024
-#ADDR=(HOST, PORT)
+ADDR=(config['HOST'], config['PORT'])
 
-#ClientSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#ClientSock.connect(ADDR)
+def print_help():
+    print "Help:"
+    print """    SET key value           Set value.
+    GET key
+    AUTH username password
+    URL name url
+    QUIT|quit|EXIT|exit|q       close termimal"""
+    print
 
-#while True:
-#    sdata = raw_input('> ')
-#    if not sdata:
-#        break
-#    ClientSock.send('%s\r\n' % sdata)
-#    rdata = ClientSock.recv(BUFSIZ)
-#    if not rdata:
-#        break
-#    print rdata
+class ClientSocket(object):
+    def __init__(self, ADDR):
+        self.addr = ADDR
+        self.tcpsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect()
 
-#ClientSock.close()
+    def connect(self):
+        self.tcpsock.connect(self.addr)
 
+    def send(self, data):
+        self.tcpsock.send('%s\r\n' % data)
+
+    def recv(self, bufsize=1024):
+        return self.tcpsock.recv(bufsize)
+
+    def close(self):
+        self.tcpsock.close()
+
+    def sendrecvclose(self, data):
+        self.send(data)
+        rdata = self.recv()
+        self.close()
+        return rdata
+
+def main():
+
+    clisock = ClientSocket(ADDR)
+
+    #是否为交互shell情况
+    if config['shell']:
+        print_help()
+        while True:
+            sdata = raw_input('> ').strip()
+            if not sdata:
+                continue
+            elif (sdata == 'exit' or sdata == 'EXIT' or
+                  sdata == 'quit' or sdata == 'QUIT' or
+                  sdata == 'q' or sdata == 'Q'):
+                break
+
+            clisock.send(sdata)
+            rdata = clisock.recv()
+            if not rdata:
+                break
+            print rdata
+
+        clisock.close()
+
+    elif config['kvset']:
+        sdata = {'SET': {config['kvset'][0]: config['kvset'][1]}}
+        print clisock.sendrecvclose(sdata)
+    elif config['kget']:
+        sdata = {'GET': config['kget'][0]}
+        print clisock.sendrecvclose(sdata)
+    elif config['auth']:
+        sdata = {'AUTH': {config['auth'][0]: config['auth'][1]}}
+        print clisock.sendrecvclose(sdata)
+    elif config['url']:
+        sdata = {'URL': {config['url'][0]: config['url'][1]}}
+        print clisock.sendrecvclose(sdata)
+
+if __name__ == '__main__':
+    main()
 
 
