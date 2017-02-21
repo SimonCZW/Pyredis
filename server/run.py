@@ -1,15 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os
 import argparse
+import threading
+from SocketServer import TCPServer, ThreadingMixIn, StreamRequestHandler
 
-from SocketServer import (TCPServer as TCP, StreamRequestHandler as SRH)
-from time import ctime
-
-HOST=''
-PORT=5678
-ADDR=(HOST, PORT)
 #AUTH_FILE = '/etc/pyredis/auth.conf'
 AUTH_FILE = 'auth.conf'
 
@@ -81,16 +76,40 @@ def get_config():
             config[k] = v
 
     return config
+#print get_config()
 
-print get_config()
 
-class MyRequestHandler(SRH):
+class MyRequestHandler(StreamRequestHandler):
     def handle(self):
-        print 'connected from:', self.client_address
-        self.wfile.write('[%s] %s' % (ctime(),
+        cur_thread = threading.current_thread()
+        print 'connected from:', self.client_address, cur_thread
+        self.wfile.write('[%s] %s' % (cur_thread,
             self.rfile.readline()))
 
-#tcpServ=TCP(ADDR, MyRequestHandler)
-#print 'waiting for connecting...'
-#tcpServ.serve_forever()
+
+class PyredisThreadingTCPServer(ThreadingMixIn, TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+if __name__ == '__main__':
+    config = get_config()
+    ADDR = (config['HOST'], config['PORT'])
+
+    server = PyredisThreadingTCPServer(ADDR, MyRequestHandler)
+    try:
+        server.serve_forever()
+    #ctrl - c
+    except KeyboardInterrupt:
+        server.shutdown()
+        server.server_close()
+
+    #try:
+    #    server_thread = threading.Thread(target = server.serve_forever)
+    #    server_thread.setDaemon(True)
+    #    server_thread.start()
+    #    print "Server loop runing in thread:", server_thread.name
+    #except KeyboardInterrupt:
+    #    server.shutdown()
+    #    server.server_close()
+
 
