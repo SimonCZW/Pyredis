@@ -10,10 +10,13 @@ class KVDB(dict):
         try:
             return self[key]
         except KeyError:
-            raise AttributeError("has no attribute '%s'" % key)
+            #raise AttributeError("has no attribute '%s'" % key)
+            return None
 
     def kvset(self, key, value):
         self[key] = value
+        return True
+
 
 if __name__ == '__main__':
     a=KVDB()
