@@ -87,16 +87,93 @@ class MyRequestHandler(StreamRequestHandler):
     def handle(self):
         cur_thread = threading.current_thread()
         print 'connected from:', self.client_address, cur_thread
-        #self.wfile.write('[%s] %s' % (cur_thread,
-        #    self.rfile.readline()))
+
         global _db
-        (cmd, key, value) = self.rfile.readline().strip().split()
-        if (cmd == 'SET' and key is not None and
-            value is not None):
-            _db.kvset(key, value)
-            print _db.kget(key)
-        elif cmd == 'GET':
-            self.wfile.write(_db.kget(key))
+        is_auth_user = False
+
+        cmds = self.rfile.readline().strip().split()
+        action = cmds[0].upper()
+        if action == 'SET':
+            if len(cmds) != 3:
+                self.wfile.write(
+                    (1, "Only need three arguements(SET key value)."))
+            else:
+                #should judge key and value type
+                (key, value) = (cmds[1].strip("\'").strip("\""),
+                                cmds[2].strip("\'").strip("\""))
+                if _db.kvset(key, value):
+                    self.wfile.write(0)
+
+        elif action == 'GET':
+            if len(cmds) != 2:
+                self.wfile.write(
+                    (1, "Only need two arguements(GET key)."))
+            else:
+                value = _db.kget(cmds[1].strip("\'").strip("\""))
+                if value:
+                    self.wfile.write(value)
+                else:
+                    self.wfile.write(None)
+
+        elif action == 'AUTH':
+            if len(cmds) != 3:
+                self.wfile.write(
+                    (1, "Only need three arguements(AUTH username password)."))
+            else:
+                (username, password) = (str(cmds[1].strip("\'").strip("\"")),
+                                        str(cmds[2].strip("\'").strip("\"")))
+                global config
+                auths = config['authconf'] #'authconf': [{'czw': '123456'}]
+
+                for auth in auths:
+                    if {username: password} == auth:
+                        is_auth_user = True
+
+                if is_auth_user:
+                    self.wfile.write(0)
+                else:
+                    self.wfile.write(-1)
+
+        elif action == 'URL':
+            if len(cmds) != 3:
+                self.wfile.write(
+                    (1, "Only need three arguements(AUTH username password)."))
+            else:
+                #not auth
+                if not is_auth_user:
+                    self.wfile.write(None)
+                #auth
+                else:
+                    (name, url) = (str(cmds[1].strip("\'").strip("\"")),
+                                   str(cmds[2].strip("\'").strip("\"")))
+                    url_value = _db.kget(name)
+                    if url_value:
+                        self.wfile.write(url_value)
+                    else:
+                        import re
+                        if not re.match('http://|https://', url):
+                            url = 'http://' + url
+
+                        import urllib2
+                        try:
+                            rq = urllib2.urlopen(url)
+                            status_code = rq.code
+                            url_size = len(rq.read())
+                        except:
+                            status_code = 404
+                            url_size = 0
+                        finally:
+                            url_value = (status_code , url_size)
+
+                        if (_db.kvset(name, url_value)
+                                and url_value is not None):
+                            self.wfile.write(url_value)
+                        else:
+                            self.wfile.write(
+                                (1, 'Cannot combine %s with %s' % (name,
+                                                                   url_value)))
+        else:
+            self.wfile.write((1, "No such command."))
 
 class PyredisThreadingTCPServer(ThreadingMixIn, TCPServer):
     daemon_threads = True
