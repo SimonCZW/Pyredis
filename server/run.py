@@ -4,7 +4,9 @@
 import os
 import argparse
 import threading
-from SocketServer import TCPServer, ThreadingMixIn, StreamRequestHandler
+from SocketServer import TCPServer, ThreadingMixIn, StreamRequestHandler, BaseRequestHandler
+
+from store import KVDB
 
 #AUTH_FILE = '/etc/pyredis/auth.conf'
 AUTH_FILE = 'auth.conf'
@@ -81,23 +83,36 @@ def get_config():
 
 
 class MyRequestHandler(StreamRequestHandler):
+
     def handle(self):
         cur_thread = threading.current_thread()
         print 'connected from:', self.client_address, cur_thread
-        self.wfile.write('[%s] %s' % (cur_thread,
-            self.rfile.readline()))
-
+        #self.wfile.write('[%s] %s' % (cur_thread,
+        #    self.rfile.readline()))
+        global _db
+        (cmd, key, value) = self.rfile.readline().strip().split()
+        if (cmd == 'SET' and key is not None and
+            value is not None):
+            _db.kvset(key, value)
+            print _db.kget(key)
+        elif cmd == 'GET':
+            self.wfile.write(_db.kget(key))
 
 class PyredisThreadingTCPServer(ThreadingMixIn, TCPServer):
     daemon_threads = True
     allow_reuse_address = True
 
+
 if __name__ == '__main__':
     config = get_config()
     ADDR = (config['HOST'], config['PORT'])
 
+    #for threading sharing same data
+    _db = KVDB()
+
     server = PyredisThreadingTCPServer(ADDR, MyRequestHandler)
     try:
+        print "Pyredis listening in: %s ..." % str(ADDR)
         server.serve_forever()
     #ctrl - c
     except KeyboardInterrupt:
