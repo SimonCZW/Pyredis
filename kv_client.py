@@ -168,7 +168,9 @@ def main():
 
     #interact shell with server
     if config['shell']:
+        #print help first
         print_help()
+
         try:
             while True:
                 sdata = raw_input('> ').strip()
