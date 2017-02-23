@@ -6,39 +6,41 @@ import argparse
 
 #parsing arguments and subcommand
 def arg_parse():
+    """parsing arguments and subcommand"""
+
     parent_parser = argparse.ArgumentParser(add_help=False)
     parent_parser.add_argument(
         '-d', '--debug',
-        action = 'store_true',
-        default = False,
-        help = 'print debug infomation'
+        action='store_true',
+        default=False,
+        help='print debug infomation'
         )
 
     parser = argparse.ArgumentParser(
-        prog = 'kv_client',
-        parents = [parent_parser],
+        prog='kv_client',
+        parents=[parent_parser],
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description = 'pyredis client.')
+        description='pyredis client.')
     parser.add_argument(
         '--host',
-        action = 'store',
-        type = str,
-        dest = 'HOST',
-        default = '127.0.0.1',
-        help = 'host',
-        metavar = '127.0.0.1')
+        action='store',
+        type=str,
+        dest='HOST',
+        default='127.0.0.1',
+        help='host',
+        metavar='127.0.0.1')
     parser.add_argument(
-        '--port','-p',
-        action = 'store',
-        type = int,
-        dest = 'PORT',
-        default = '5678',
-        help = 'host to bind to',
-        metavar = '5678')
+        '--port', '-p',
+        action='store',
+        type=int,
+        dest='PORT',
+        default='5678',
+        help='host to bind to',
+        metavar='5678')
 
     subparsers = parser.add_subparsers(
-        title = 'Subcommands CMD',
-        description = """    SHELL                   Open a shell.
+        title='Subcommands CMD',
+        description="""    SHELL                   Open a shell.
     SET key value           Set value.
     GET key
     AUTH username password
@@ -46,65 +48,67 @@ def arg_parse():
 
     parser_set = subparsers.add_parser(
         'SET',
-        parents = [parent_parser],
-        usage = '%(prog)s [-h] key value',
-        help = 'SET key value')
+        parents=[parent_parser],
+        usage='%(prog)s [-h] key value',
+        help='SET key value')
     parser_set.add_argument(
-        action = 'store',
-        dest = 'kvset',
-        nargs = 2,
-        help = 'SET key value')
+        action='store',
+        dest='kvset',
+        nargs=2,
+        help='SET key value')
 
     parser_get = subparsers.add_parser(
         'GET',
-        parents = [parent_parser],
-        usage = '%(prog)s [-h] key',
-        help = 'GET key')
+        parents=[parent_parser],
+        usage='%(prog)s [-h] key',
+        help='GET key')
     parser_get.add_argument(
-        action = 'store',
-        dest = 'kget',
-        nargs = 1,
-        help = 'GET key')
+        action='store',
+        dest='kget',
+        nargs=1,
+        help='GET key')
 
     parser_get = subparsers.add_parser(
         'AUTH',
-        parents = [parent_parser],
-        usage = '%(prog)s [-h] username password',
-        help = 'AUTH username password')
+        parents=[parent_parser],
+        usage='%(prog)s [-h] username password',
+        help='AUTH username password')
     parser_get.add_argument(
-        action = 'store',
-        dest = 'auth',
-        nargs = 2,
-        help = 'AUTH username password')
+        action='store',
+        dest='auth',
+        nargs=2,
+        help='AUTH username password')
 
     parser_get = subparsers.add_parser(
         'URL',
-        parents = [parent_parser],
-        usage = '%(prog)s [-h] name url',
-        help = 'URL name url')
+        parents=[parent_parser],
+        usage='%(prog)s [-h] name url',
+        help='URL name url')
     parser_get.add_argument(
-        action = 'store',
-        dest = 'url',
-        nargs = 2,
-        help = 'URL name url')
+        action='store',
+        dest='url',
+        nargs=2,
+        help='URL name url')
 
     parser_get = subparsers.add_parser(
         'SHELL',
-        usage = '%(prog)s [-h]',
-        help = 'Open a shell.')
+        usage='%(prog)s [-h]',
+        help='Open a shell.')
     parser_get.add_argument(
-        action = 'store_true',
-        dest = 'shell',
-        help = 'Open a shell.')
+        action='store_true',
+        dest='shell',
+        help='Open a shell.')
     return parser.parse_args()
 
 #get config
 def get_config():
+    """return config"""
+
     config = {}
     args = arg_parse()
-    for k,v in vars(args).iteritems():
-        if v:
-            config[k] = v
+    for key, value in vars(args).iteritems():
+        if value:
+            config[key] = value
         config.setdefault('shell', False)
         config.setdefault('kvset', False)
         config.setdefault('kget', False)
@@ -115,17 +119,21 @@ def get_config():
 
 #print help information before interact shell
 def print_help():
+    """print help information before interact shell"""
+
     print "Help:"
     print """    SET key value           Set value.
     GET key
     AUTH username password
     URL name url
-    QUIT|quit|EXIT|exit|q       close termimal"""
+    QUIT|quit|EXIT|exit       close termimal"""
     print
 
 
 #wrapper client tcp socket
 class ClientSocket(object):
+    """wrapper client tcp socket"""
+
     def __init__(self, ADDR):
         self.addr = ADDR
         self.tcpsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -135,22 +143,27 @@ class ClientSocket(object):
             print "Cannot connect to:", ADDR
 
     def connect(self):
+        """socket connect"""
         self.tcpsock.connect(self.addr)
 
     def send(self, data):
+        """send data"""
         self.tcpsock.send('%s\r\n' % data)
-        #self.tcpsock.send(data)
 
     def sendall(self, data):
+        """send data"""
         self.tcpsock.sendall('%s\r\n' % data)
 
     def recv(self, bufsize=1024):
+        """recv data"""
         return self.tcpsock.recv(bufsize)
 
     def close(self):
+        """close socket"""
         self.tcpsock.close()
 
     def sendrecvclose(self, data):
+        """send data, recv data and close socket"""
         self.send(data)
         rdata = self.recv()
         self.close()
@@ -158,13 +171,14 @@ class ClientSocket(object):
 
 
 def main():
+    """main function"""
 
     #get config
     config = get_config()
-    ADDR=(config['HOST'], config['PORT'])
+    address = (config['HOST'], config['PORT'])
 
     #get socket and auto connect to ADDR
-    clisock = ClientSocket(ADDR)
+    clisock = ClientSocket(address)
 
     #interact shell with server
     if config['shell']:
@@ -181,8 +195,7 @@ def main():
 
                 #quit shell
                 elif (sdata == 'exit' or sdata == 'EXIT' or
-                      sdata == 'quit' or sdata == 'QUIT' or
-                      sdata == 'q' or sdata == 'Q'):
+                      sdata == 'quit' or sdata == 'QUIT'):
                     break
 
                 #help
@@ -227,5 +240,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
