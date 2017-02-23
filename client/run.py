@@ -4,6 +4,7 @@
 import socket
 import argparse
 
+#parsing arguments and subcommand
 def arg_parse():
     parent_parser = argparse.ArgumentParser(add_help=False)
     parent_parser.add_argument(
@@ -97,21 +98,22 @@ def arg_parse():
         help = 'Open a shell.')
     return parser.parse_args()
 
-config = {}
-args = arg_parse()
-for k,v in vars(args).iteritems():
-    if v:
-        config[k] = v
-    config.setdefault('shell', False)
-    config.setdefault('kvset', False)
-    config.setdefault('kget', False)
-    config.setdefault('auth', False)
-    config.setdefault('url', False)
+#get config
+def get_config():
+    config = {}
+    args = arg_parse()
+    for k,v in vars(args).iteritems():
+        if v:
+            config[k] = v
+        config.setdefault('shell', False)
+        config.setdefault('kvset', False)
+        config.setdefault('kget', False)
+        config.setdefault('auth', False)
+        config.setdefault('url', False)
+    return config
 
-#print config
 
-ADDR=(config['HOST'], config['PORT'])
-
+#print help information before interact shell
 def print_help():
     print "Help:"
     print """    SET key value           Set value.
@@ -121,17 +123,26 @@ def print_help():
     QUIT|quit|EXIT|exit|q       close termimal"""
     print
 
+
+#wrapper client tcp socket
 class ClientSocket(object):
     def __init__(self, ADDR):
         self.addr = ADDR
         self.tcpsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect()
+        try:
+            self.connect()
+        except:
+            print "Cannot connect to:", ADDR
 
     def connect(self):
         self.tcpsock.connect(self.addr)
 
     def send(self, data):
         self.tcpsock.send('%s\r\n' % data)
+        #self.tcpsock.send(data)
+
+    def sendall(self, data):
+        self.tcpsock.sendall('%s\r\n' % data)
 
     def recv(self, bufsize=1024):
         return self.tcpsock.recv(bufsize)
@@ -145,42 +156,72 @@ class ClientSocket(object):
         self.close()
         return rdata
 
+
 def main():
 
+    #get config
+    config = get_config()
+    ADDR=(config['HOST'], config['PORT'])
+
+    #get socket and auto connect to ADDR
     clisock = ClientSocket(ADDR)
 
-    #是否为交互shell情况
+    #interact shell with server
     if config['shell']:
         print_help()
-        while True:
-            sdata = raw_input('> ').strip()
-            if not sdata:
-                continue
-            elif (sdata == 'exit' or sdata == 'EXIT' or
-                  sdata == 'quit' or sdata == 'QUIT' or
-                  sdata == 'q' or sdata == 'Q'):
-                break
+        try:
+            while True:
+                sdata = raw_input('> ').strip()
 
-            clisock.send(sdata)
-            rdata = clisock.recv()
-            if not rdata:
-                break
-            print rdata
+                #input nothing
+                if not sdata:
+                    continue
 
-        clisock.close()
+                #quit shell
+                elif (sdata == 'exit' or sdata == 'EXIT' or
+                      sdata == 'quit' or sdata == 'QUIT' or
+                      sdata == 'q' or sdata == 'Q'):
+                    break
 
+                #help
+                elif sdata == 'help' or sdata == 'HELP':
+                    print_help()
+
+                #send something to server
+                else:
+                    clisock.send(sdata)
+                    rdata = clisock.recv()
+                    #if not rdata:
+                    #    break
+                    print rdata
+        #ctrl-c
+        except KeyboardInterrupt:
+            #send none, cause disconnect message printed in server
+            clisock.send('')
+            #connect close
+            clisock.close()
+
+    #subcommand: SET key value
     elif config['kvset']:
-        sdata = {'SET': {config['kvset'][0]: config['kvset'][1]}}
+        #sdata = {'SET': {config['kvset'][0]: config['kvset'][1]}}
+        sdata = 'SET'+" "+config['kvset'][0]+" "+config['kvset'][1]
         print clisock.sendrecvclose(sdata)
+
+    #subcommand: GET key
     elif config['kget']:
-        sdata = {'GET': config['kget'][0]}
+        sdata = 'GET'+" "+config['kget'][0]
         print clisock.sendrecvclose(sdata)
+
+    #subcommand: AUTH username password
     elif config['auth']:
-        sdata = {'AUTH': {config['auth'][0]: config['auth'][1]}}
+        sdata = 'AUTH'+" "+config['auth'][0]+" "+config['auth'][1]
         print clisock.sendrecvclose(sdata)
+
+    #subcommand: URL name url
     elif config['url']:
-        sdata = {'URL': {config['url'][0]: config['url'][1]}}
+        sdata = 'URL'+" "+config['url'][0]+" "+config['url'][1]
         print clisock.sendrecvclose(sdata)
+
 
 if __name__ == '__main__':
     main()
