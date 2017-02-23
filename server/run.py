@@ -200,11 +200,25 @@ class MyRequestHandler(StreamRequestHandler):
                                         (name, url_value)))
             #cause by client CMD quit|q|exit
             elif action is None:
-                pass
+                break
 
             #other cmd
             else:
                 self.wfile.write((1, "No such command."))
+
+    def finish(self):
+        #copy from streamrequesthandler
+        if not self.wfile.closed:
+            try:
+                self.wfile.flush()
+            except socket.error:
+                pass
+        self.wfile.close()
+        self.rfile.close()
+
+        #print disconnect information
+        cur_thread = threading.current_thread()
+        print 'disconnect :', self.client_address, cur_thread
 
 
 class PyredisThreadingTCPServer(ThreadingMixIn, TCPServer):
