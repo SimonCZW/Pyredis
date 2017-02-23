@@ -88,92 +88,124 @@ class MyRequestHandler(StreamRequestHandler):
         cur_thread = threading.current_thread()
         print 'connected from:', self.client_address, cur_thread
 
+        #sharing kvdb between threads
         global _db
+
+        #default no auth
         is_auth_user = False
 
-        cmds = self.rfile.readline().strip().split()
-        action = cmds[0].upper()
-        if action == 'SET':
-            if len(cmds) != 3:
-                self.wfile.write(
-                    (1, "Only need three arguements(SET key value)."))
-            else:
-                #should judge key and value type
-                (key, value) = (cmds[1].strip("\'").strip("\""),
-                                cmds[2].strip("\'").strip("\""))
-                if _db.kvset(key, value):
-                    self.wfile.write(0)
+        #for recv multiple data sent from client
+        #and interact with client
+        while True:
+            self.rfile = self.connection.makefile('rb', self.rbufsize)
+            self.wfile = self.connection.makefile('wb', self.wbufsize)
 
-        elif action == 'GET':
-            if len(cmds) != 2:
-                self.wfile.write(
-                    (1, "Only need two arguements(GET key)."))
+            cmds = self.rfile.readline().strip().split()
+            #aviod nont data from client(cause by CMD: quit|q|exit)
+            if cmds:
+                action = cmds[0].upper()
             else:
-                value = _db.kget(cmds[1].strip("\'").strip("\""))
-                if value:
-                    self.wfile.write(value)
+                action = None
+
+            #judge action
+            if action == 'SET':
+                if len(cmds) != 3:
+                    self.wfile.write(
+                        (1, "Only need three arguements(SET key value)."))
                 else:
-                    self.wfile.write(None)
+                    #should judge key and value type before storing ...
+                    (key, value) = (cmds[1].strip("\'").strip("\""),
+                                    cmds[2].strip("\'").strip("\""))
+                    #set k-v
+                    if _db.kvset(key, value):
+                        self.wfile.write(0)
 
-        elif action == 'AUTH':
-            if len(cmds) != 3:
-                self.wfile.write(
-                    (1, "Only need three arguements(AUTH username password)."))
-            else:
-                (username, password) = (str(cmds[1].strip("\'").strip("\"")),
-                                        str(cmds[2].strip("\'").strip("\"")))
-                global config
-                auths = config['authconf'] #'authconf': [{'czw': '123456'}]
-
-                for auth in auths:
-                    if {username: password} == auth:
-                        is_auth_user = True
-
-                if is_auth_user:
-                    self.wfile.write(0)
+            elif action == 'GET':
+                if len(cmds) != 2:
+                    self.wfile.write(
+                        (1, "Only need two arguements(GET key)."))
                 else:
-                    self.wfile.write(-1)
-
-        elif action == 'URL':
-            if len(cmds) != 3:
-                self.wfile.write(
-                    (1, "Only need three arguements(AUTH username password)."))
-            else:
-                #not auth
-                if not is_auth_user:
-                    self.wfile.write(None)
-                #auth
-                else:
-                    (name, url) = (str(cmds[1].strip("\'").strip("\"")),
-                                   str(cmds[2].strip("\'").strip("\"")))
-                    url_value = _db.kget(name)
-                    if url_value:
-                        self.wfile.write(url_value)
+                    #get value by key
+                    value = _db.kget(cmds[1].strip("\'").strip("\""))
+                    if value:
+                        self.wfile.write(value)
                     else:
-                        import re
-                        if not re.match('http://|https://', url):
-                            url = 'http://' + url
+                        self.wfile.write(None)
 
-                        import urllib2
-                        try:
-                            rq = urllib2.urlopen(url)
-                            status_code = rq.code
-                            url_size = len(rq.read())
-                        except:
-                            status_code = 404
-                            url_size = 0
-                        finally:
-                            url_value = (status_code , url_size)
+            elif action == 'AUTH':
+                if len(cmds) != 3:
+                    self.wfile.write((1,
+                         "Only need three arguements(AUTH username password)."))
+                else:
+                    (username, password)=(str(cmds[1].strip("\'").strip("\"")),
+                                          str(cmds[2].strip("\'").strip("\"")))
+                    #each thread get authconf by global
+                    global config
+                    auths = config['authconf'] #'authconf': [{'czw': '123456'}]
 
-                        if (_db.kvset(name, url_value)
-                                and url_value is not None):
+                    #identify username and password
+                    for auth in auths:
+                        if {username: password} == auth:
+                            is_auth_user = True
+
+                    if is_auth_user:
+                        self.wfile.write(0)
+                    else:
+                        self.wfile.write(-1)
+
+            elif action == 'URL':
+                if len(cmds) != 3:
+                    self.wfile.write((1,
+                         "Only need three arguements(URL name url)."))
+                else:
+                    #not auth ,then return none
+                    if not is_auth_user:
+                        self.wfile.write(None)
+                    #auth
+                    else:
+                        (name, url) = (str(cmds[1].strip("\'").strip("\"")),
+                                       str(cmds[2].strip("\'").strip("\"")))
+                        #attempt to get value by urlname
+                        url_value = _db.kget(name)
+
+                        #has value by name
+                        if url_value:
                             self.wfile.write(url_value)
+                        #without value, then obtain value by url and set k-v
                         else:
-                            self.wfile.write(
-                                (1, 'Cannot combine %s with %s' % (name,
-                                                                   url_value)))
-        else:
-            self.wfile.write((1, "No such command."))
+                            #get standard url format
+                            import re
+                            if not re.match('http://|https://', url):
+                                url = 'http://' + url
+
+                            #get url's status_code and size
+                            import urllib2
+                            try:
+                                rq = urllib2.urlopen(url)
+                                status_code = rq.code
+                                url_size = len(rq.read())
+                            except:
+                                status_code = 404
+                                url_size = 0
+                            finally:
+                                url_value = (status_code , url_size)
+
+                            #set k-v and return
+                            if (_db.kvset(name, url_value)
+                                    and url_value is not None):
+                                self.wfile.write(url_value)
+                            else:
+                                self.wfile.write(
+                                    (1, 'Cannot combine %s with %s' %
+                                        (name, url_value)))
+            #cause by client CMD quit|q|exit
+            elif action is None:
+                pass
+
+            #other cmd
+            else:
+                self.wfile.write((1, "No such command."))
+
 
 class PyredisThreadingTCPServer(ThreadingMixIn, TCPServer):
     daemon_threads = True
@@ -195,14 +227,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         server.shutdown()
         server.server_close()
-
-    #try:
-    #    server_thread = threading.Thread(target = server.serve_forever)
-    #    server_thread.setDaemon(True)
-    #    server_thread.start()
-    #    print "Server loop runing in thread:", server_thread.name
-    #except KeyboardInterrupt:
-    #    server.shutdown()
-    #    server.server_close()
 
 
