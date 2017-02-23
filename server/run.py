@@ -8,6 +8,7 @@ from SocketServer import TCPServer, ThreadingMixIn, StreamRequestHandler, BaseRe
 
 from store import KVDB
 
+#default AUTH configfile path
 #AUTH_FILE = '/etc/pyredis/auth.conf'
 AUTH_FILE = 'auth.conf'
 
@@ -79,11 +80,11 @@ def get_config():
             config[k] = v
 
     return config
-#print get_config()
 
 
 class MyRequestHandler(StreamRequestHandler):
 
+    #handle request each thread
     def handle(self):
         cur_thread = threading.current_thread()
         print 'connected from:', self.client_address, cur_thread
@@ -206,6 +207,7 @@ class MyRequestHandler(StreamRequestHandler):
             else:
                 self.wfile.write((1, "No such command."))
 
+    #cleanup and print for disconnect
     def finish(self):
         #copy from streamrequesthandler
         if not self.wfile.closed:
@@ -233,6 +235,7 @@ if __name__ == '__main__':
     #for threading sharing same data
     _db = KVDB()
 
+    #create server and give request handler
     server = PyredisThreadingTCPServer(ADDR, MyRequestHandler)
     try:
         print "Pyredis listening in: %s ..." % str(ADDR)
