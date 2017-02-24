@@ -112,8 +112,8 @@ class MyRequestHandler(StreamRequestHandler):
     def handle(self):
         """handle request each thread"""
 
-        cur_thread = threading.current_thread()
-        print 'connected from:', self.client_address, cur_thread
+        self.cur_thread = threading.current_thread()
+        print 'connected from:', self.client_address, self.cur_thread
 
         #sharing kvdb between threads
         global kvdb
@@ -127,13 +127,12 @@ class MyRequestHandler(StreamRequestHandler):
             self.wfile = self.connection.makefile('wb', self.wbufsize)
 
             cmds = self.rfile.readline().strip().split()
-            #aviod nont data from client(cause by CMD: quit|q|exit)
+            #aviod nont data from client(cause by CMD: quit|exit)
             if cmds:
                 action = cmds[0].upper()
             else:
                 action = None
 
-            #judge action
             if action == 'SET':
                 if len(cmds) != 3:
                     self.wfile.write(
@@ -187,7 +186,6 @@ class MyRequestHandler(StreamRequestHandler):
                     #not auth ,then return none
                     if not is_auth_user:
                         self.wfile.write(None)
-                    #auth
                     else:
                         (name, url) = (str(cmds[1].strip("\'").strip("\"")),
                                        str(cmds[2].strip("\'").strip("\"")))
@@ -224,7 +222,7 @@ class MyRequestHandler(StreamRequestHandler):
                                 self.wfile.write(
                                     (1, 'Cannot combine %s with %s' %
                                      (name, url_value)))
-            #cause by client CMD quit|q|exit
+            #cause by client CMD quit|exit
             elif action is None:
                 break
 
@@ -244,9 +242,7 @@ class MyRequestHandler(StreamRequestHandler):
         self.wfile.close()
         self.rfile.close()
 
-        #print disconnect information
-        cur_thread = threading.current_thread()
-        print 'disconnect :', self.client_address, cur_thread
+        print 'disconnect :', self.client_address, self.cur_thread
 
 
 class PyredisThreadingTCPServer(ThreadingMixIn, TCPServer):
@@ -264,11 +260,11 @@ if __name__ == '__main__':
     kvdb = KVDB()
 
     #create server and give request handler
-    tcpServer = PyredisThreadingTCPServer(ADDR, MyRequestHandler)
+    tcp_server = PyredisThreadingTCPServer(ADDR, MyRequestHandler)
     try:
         print "Pyredis listening in: %s ..." % str(ADDR)
-        tcpServer.serve_forever()
+        tcp_server.serve_forever()
     #ctrl - c
     except KeyboardInterrupt:
-        tcpServer.shutdown()
-        tcpServer.server_close()
+        tcp_server.shutdown()
+        tcp_server.server_close()
