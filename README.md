@@ -15,7 +15,8 @@ usage: kv_client [-h] [-d] [--host 127.0.0.1] [--port 5678] {SET,GET,AUTH,URL,SH
 
 - Subcommand:
   - `python kv_client SHELL`: Open a interact shell, can execute SET, GET, AUTH, URL, HELP command.
-  - `python kv_client GET key value`: Set k-v.
+  - `python kv_client SET key value`: Set k-v.
+  - `python kv_client GET key`: Get value by key.
   - `python kv_client AUTH username password`: Auth user for executing URL command, if match return 0 else return -1.
   - `python kv_client URL name url`: return url's status_code and len.
 
