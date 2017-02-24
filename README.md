@@ -1,4 +1,7 @@
 # Pyredis
+
+**Have to close this project until I have money for private...**
+
 A DB store Key-Value written by python like redis for fun.
 
 # Usage
