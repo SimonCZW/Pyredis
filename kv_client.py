@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import sys
 import socket
 import argparse
 
@@ -137,14 +138,15 @@ class ClientSocket(object):
     def __init__(self, ADDR):
         self.addr = ADDR
         self.tcpsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            self.connect()
-        except:
-            print "Cannot connect to:", ADDR
+        self.connect()
 
     def connect(self):
         """socket connect"""
-        self.tcpsock.connect(self.addr)
+        try:
+            self.tcpsock.connect(self.addr)
+        except socket.error:
+            print "Cannot connect to: %s ..." % (self.addr,)
+            sys.exit(1)
 
     def send(self, data):
         """send data"""
